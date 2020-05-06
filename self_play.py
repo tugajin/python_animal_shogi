@@ -37,7 +37,7 @@ def write_data(history):
         pickle.dump(history, f)
 
 # 1ゲームの実行
-def play(model):
+def play(model,device):
     # 学習データ
     history = []
 
@@ -50,7 +50,7 @@ def play(model):
             break
 
         # 合法手の確率分布の取得
-        scores = pv_mcts_scores(model, state, SP_TEMPERATURE)
+        scores = pv_mcts_scores(model,device, state, SP_TEMPERATURE)
 
         # 学習データに状態と方策を追加
         policies = [0] * DN_OUTPUT_SIZE
@@ -60,10 +60,10 @@ def play(model):
 
         # 行動の取得
         action = np.random.choice(state.legal_actions(), p=scores)
-
+    
         # 次の状態の取得
         state = state.next(action)
-
+        
     # 学習データに価値を追加
     value = first_player_value(state)
     for i in range(len(history)):
@@ -77,6 +77,10 @@ def self_play():
     history = []
     # ベストプレイヤーのモデルの読み込み
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    # なぜかcpuのほうが早い。
+    device = 'cpu'
+    
     model = DualNet()
     model.load_state_dict(torch.load('./model/best.h5'))
     model = model.double()
@@ -86,7 +90,7 @@ def self_play():
     # 複数回のゲームの実行
     for i in range(SP_GAME_COUNT):
         # 1ゲームの実行
-        h = play(model)
+        h = play(model,device)
         
         history.extend(h)
 

@@ -13,14 +13,13 @@ from dual_network import *
 PV_EVALUATE_COUNT = 50 # 1推論あたりのシミュレーション回数（本家は1600）
 
 # 推論
-def predict(model, state):
+def predict(model,device, state):
     # 推論のための入力データのシェイプの変換
     file, rank, channel = DN_INPUT_SHAPE
     x = np.array(state.pieces_array())
     x = x.reshape(channel, file, rank)
     x = np.array([x])
     x = torch.tensor(x,dtype=torch.double)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     x = x.to(device)
     # 推論
     y = model(x)
@@ -42,7 +41,7 @@ def nodes_to_scores(nodes):
     return scores
 
 # モンテカルロ木探索のスコアの取得
-def pv_mcts_scores(model, state, temperature):
+def pv_mcts_scores(model,device, state, temperature):
     # モンテカルロ木探索のノードの定義
     class Node:
         # ノードの初期化
@@ -68,7 +67,7 @@ def pv_mcts_scores(model, state, temperature):
             # 子ノードが存在しない時
             if not self.child_nodes:
                 # ニューラルネットワークの推論で方策と価値を取得
-                policies, value = predict(model, self.state)
+                policies, value = predict(model,device, self.state)
 
                 # 累計価値と試行回数の更新
                 self.w += value
@@ -121,9 +120,9 @@ def pv_mcts_scores(model, state, temperature):
     return scores
 
 # モンテカルロ木探索で行動選択
-def pv_mcts_action(model, temperature=0):
-    def pv_mcts_action(state):
-        scores = pv_mcts_scores(model, state, temperature)
+def pv_mcts_action(model,device, temperature=0):
+    def pv_mcts_action(state,device):
+        scores = pv_mcts_scores(model,device, state, temperature)
         return np.random.choice(state.legal_actions(), p=scores)
     return pv_mcts_action
 
@@ -149,7 +148,7 @@ if __name__ == '__main__':
     state = State()
 
     # モンテカルロ木探索で行動取得を行う関数の生成
-    next_action = pv_mcts_action(model, 1.0)
+    next_action = pv_mcts_action(model,device, 1.0)
 
     # ゲーム終了までループ
     while True:
@@ -158,7 +157,7 @@ if __name__ == '__main__':
             break
 
         # 行動の取得
-        action = next_action(state)
+        action = next_action(state,device)
 
         # 次の状態の取得
         state = state.next(action)
