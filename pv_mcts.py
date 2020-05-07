@@ -22,7 +22,8 @@ def predict(model,device, state):
     x = torch.tensor(x,dtype=torch.double)
     x = x.to(device)
     # 推論
-    y = model(x)
+    with torch.no_grad():
+        y = model(x)
 
     # 方策の取得
     policies = y[0][0][list(state.legal_actions())] # 合法手のみ
