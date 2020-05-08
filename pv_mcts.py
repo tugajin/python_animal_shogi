@@ -14,15 +14,18 @@ PV_EVALUATE_COUNT = 50 # 1推論あたりのシミュレーション回数（本
 
 # 推論
 def predict(model,device, state):
+
     # 推論のための入力データのシェイプの変換
     file, rank, channel = DN_INPUT_SHAPE
     x = np.array(state.pieces_array())
     x = x.reshape(channel, file, rank)
     x = np.array([x])
     x = torch.tensor(x,dtype=torch.double)
+    
     x = x.to(device)
-    # 推論
+    
     with torch.no_grad():
+        # 推論
         y = model(x)
 
     # 方策の取得
@@ -67,6 +70,7 @@ def pv_mcts_scores(model,device, state, temperature):
 
             # 子ノードが存在しない時
             if not self.child_nodes:
+                
                 # ニューラルネットワークの推論で方策と価値を取得
                 policies, value = predict(model,device, self.state)
 
@@ -78,16 +82,19 @@ def pv_mcts_scores(model,device, state, temperature):
                 self.child_nodes = []
                 for action, policy in zip(self.state.legal_actions(), policies):
                     self.child_nodes.append(Node(self.state.next(action), policy))
+                
                 return value
 
             # 子ノードが存在する時
             else:
+                
                 # アーク評価値が最大の子ノードの評価で価値を取得
                 value = -self.next_child_node().evaluate()
 
                 # 累計価値と試行回数の更新
                 self.w += value
                 self.n += 1
+                
                 return value
 
         # アーク評価値が最大の子ノードを取得
@@ -112,12 +119,14 @@ def pv_mcts_scores(model,device, state, temperature):
 
     # 合法手の確率分布
     scores = nodes_to_scores(root_node.child_nodes)
+    
     if temperature == 0: # 最大値のみ1
         action = np.argmax(scores)
         scores = np.zeros(len(scores))
         scores[action] = 1
     else: # ボルツマン分布でバラつき付加
         scores = boltzman(scores, temperature)
+    
     return scores
 
 # モンテカルロ木探索で行動選択

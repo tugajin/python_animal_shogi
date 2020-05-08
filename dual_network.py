@@ -49,6 +49,7 @@ class DualNet(nn.Module):
         
         
     def forward(self,x):
+
         h1 = F.relu(self.batch1(self.conv1(x)))
         
         h2 = F.relu(self.batch2(self.conv2(h1)))
@@ -62,7 +63,6 @@ class DualNet(nn.Module):
 
         h8 = F.relu(self.batch8(self.conv8(h7)))
         h9 = F.relu(self.batch9(self.conv9(h8)) + h7)
-        
         
         #policy
         h_p1 = F.relu(self.batch_p1(self.conv_p1(h9)))

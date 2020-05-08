@@ -52,7 +52,7 @@ def train_network():
     criterion_values = nn.MSELoss()
     
     for i in range(0,10):
-        print("\r epoch:" + str(i),end="")
+        print("epoch:" + str(i),end="")
         random.shuffle(indexs)
         x = []
         yp = []
@@ -74,11 +74,14 @@ def train_network():
                 
                 optimizer.zero_grad()
                 outputs = model(x)
-                loss_policies = criterion_policies(outputs[0],yp)
-                loss_values = criterion_values(outputs[1],yv)
+                output_policy = outputs[0]
+                output_value = torch.squeeze(outputs[1])
+                loss_policies = criterion_policies(output_policy,yp)
+                loss_values = criterion_values(output_value,yv)
                 loss = loss_policies + loss_values
                 loss.backward()
                 optimizer.step()
+                print("loss" + str(loss.item()))
                 x = []
                 yp = []
                 yv = []

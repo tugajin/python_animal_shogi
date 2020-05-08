@@ -15,9 +15,11 @@ import torch
 from dual_network import *
 import concurrent.futures
 import copy
+from multiprocessing import Process
 
 # パラメータの準備
-SP_GAME_COUNT = 500 # セルフプレイを行うゲーム数（本家は25000）
+PROCESS_NUM = 4
+SP_GAME_COUNT = int(500 / PROCESS_NUM) # セルフプレイを行うゲーム数（本家は25000）
 SP_TEMPERATURE = 1.0 # ボルツマン分布の温度パラメータ
 
 # 先手プレイヤーの価値
@@ -28,11 +30,14 @@ def first_player_value(ended_state):
     return 0
 
 # 学習データの保存
-def write_data(history):
+def write_data(history,id):
     now = datetime.now()
     os.makedirs('./data/', exist_ok=True) # フォルダがない時は生成
-    path = './data/{:04}{:02}{:02}{:02}{:02}{:02}.history'.format(
-        now.year, now.month, now.day, now.hour, now.minute, now.second)
+    if id == "":
+        path = './data/{:04}{:02}{:02}{:02}{:02}{:02}.history'.format(
+            now.year, now.month, now.day, now.hour, now.minute, now.second)
+    else:
+        path = './data/{}.tmp'.format(id)
     with open(path, mode='wb') as f:
         pickle.dump(history, f)
 
@@ -48,7 +53,7 @@ def play(model,device):
         # ゲーム終了時
         if state.is_done():
             break
-
+        #print("do")        
         # 合法手の確率分布の取得
         scores = pv_mcts_scores(model,device, state, SP_TEMPERATURE)
 
@@ -72,14 +77,14 @@ def play(model,device):
     return history
 
 # セルフプレイ
-def self_play():
+def self_play(id):
     # 学習データ
     history = []
     # ベストプレイヤーのモデルの読み込み
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     # なぜかcpuのほうが早い。
-    device = 'cpu'
+    #device = 'cpu'
     
     model = DualNet()
     model.load_state_dict(torch.load('./model/best.h5'))
@@ -95,33 +100,45 @@ def self_play():
         history.extend(h)
 
         # 出力
-        print('\rSelfPlay {}/{}'.format(i+1, SP_GAME_COUNT), end='')
+        print('\r{}SelfPlay {}/{}'.format(id, i+1, SP_GAME_COUNT), end='')
     print('')
     
-    write_data(history)
+    write_data(history,id)
     #return history
 
 # 並列化セルフプレイ
 def paralell_self_play():
     history = []
-#     with concurrent.futures.ProcessPoolExecutor(max_workers=1) as excuter:
-#         result_list = list(excuter.map(self_play))
-#         print(result_list)
-#         history.extend(result_list)
-#     write_data(history)
-    model = DualNet()
-    model.load_state_dict(torch.load('./model/best.h5'))
-    model = model.double()
-    model.eval()
-    model_list = []
-    for i in range(4):
-        tmp_model = copy.deepcopy(model)
-        model_list.append(tmp_model)
+    process_list = []
+    for i in range(PROCESS_NUM):
+        p = Process(target=self_play, args=(i,))
+        process_list.append(p)
         
-    with concurrent.futures.ProcessPoolExecutor(max_workers=4) as excuter:
-        result_list = list(excuter.map(self_play, model_list))
-    print(len(result_list))
+    for i in range(PROCESS_NUM):
+        print(str(i) + " start")
+        process_list[i].start()
+    for i in range(PROCESS_NUM):
+        process_list[i].join()
+    
+    # historyデータをマージ
+    xs_all = []
+    y_policies_all = []
+    y_values_all = []
+    for i in range(PROCESS_NUM):
+        history_path = sorted(Path('./data/').glob(str(i) + '.tmp'))[-1]
+        with history_path.open(mode='rb') as f:
+            data = pickle.load(f)
+        xs, y_policies, y_values = zip(*data)
+        xs_all.extend(xs)
+        y_policies_all.extend(y_policies)
+        y_values_all.extend(y_values)
+        os.remove('./data/' + str(i) + ".tmp")
+    history = [(xs_all[i],y_policies_all[i],y_values_all[i]) for i in range(len(xs_all))]
+    
+    write_data(history,"")
+    
+    
 # 動作確認
 if __name__ == '__main__':
-    #paralell_self_play()
-    self_play()
+    paralell_self_play()
+    #self_play()
