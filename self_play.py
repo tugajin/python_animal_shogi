@@ -106,7 +106,7 @@ def self_play(id,count):
         history.extend(h)
 
         # 出力
-        print('{}SelfPlay {}/{} {}'.format(id, i+1, SP_GAME_COUNT,count.value))
+        print('proc{} SelfPlay {}/{} {}'.format(id, i+1, SP_GAME_COUNT,count.value))
         i += 1
         count.value -= 1 
         if count.value <= 0:

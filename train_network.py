@@ -57,6 +57,8 @@ def train_network():
         x = []
         yp = []
         yv = []
+        sum_loss = 0.0
+        sum_num = 0
         for j in indexs:
             x.append(xs[j])
             yp.append(y_policies[j])
@@ -81,10 +83,13 @@ def train_network():
                 loss = loss_policies + loss_values
                 loss.backward()
                 optimizer.step()
-                print("loss" + str(loss.item()))
+                #print("loss" + str(loss.item()))
                 x = []
                 yp = []
                 yv = []
+                sum_loss += loss.item()
+                sum_num += 1
+        print(" avg loss " + str(sum_loss / sum_num))
 
     # 最新プレイヤーのモデルの保存
     torch.save(model.state_dict(), './model/latest.h5')
