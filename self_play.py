@@ -15,11 +15,11 @@ import torch
 from dual_network import *
 import concurrent.futures
 import copy
-from multiprocessing import Process
+from multiprocessing import Process, Value
 
 # パラメータの準備
-PROCESS_NUM = 4
-SP_GAME_COUNT = int(500 / PROCESS_NUM) # セルフプレイを行うゲーム数（本家は25000）
+PROCESS_NUM = 2
+SP_GAME_COUNT = 500 # セルフプレイを行うゲーム数（本家は25000）
 SP_TEMPERATURE = 1.0 # ボルツマン分布の温度パラメータ
 
 # 先手プレイヤーの価値
@@ -77,15 +77,20 @@ def play(model,device):
     return history
 
 # セルフプレイ
-def self_play(id):
+def self_play(id,count):
     # 学習データ
     history = []
     # ベストプレイヤーのモデルの読み込み
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     # なぜかcpuのほうが早い。
     #device = 'cpu'
-    
+    if id == '':
+      device = torch.device('cpu')
+    elif id == 0:
+      device = torch.device('cpu')
+    else:
+      device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     model = DualNet()
     model.load_state_dict(torch.load('./model/best.h5'))
     model = model.double()
@@ -93,14 +98,19 @@ def self_play(id):
     model.eval()
     
     # 複数回のゲームの実行
-    for i in range(SP_GAME_COUNT):
+    i = 0
+    while True:
         # 1ゲームの実行
         h = play(model,device)
         
         history.extend(h)
 
         # 出力
-        print('\r{}SelfPlay {}/{}'.format(id, i+1, SP_GAME_COUNT), end='')
+        print('{}SelfPlay {}/{} {}'.format(id, i+1, SP_GAME_COUNT,count.value))
+        i += 1
+        count.value -= 1 
+        if count.value <= 0:
+          break
     print('')
     
     write_data(history,id)
@@ -108,22 +118,29 @@ def self_play(id):
 
 # 並列化セルフプレイ
 def paralell_self_play():
+    
+
     history = []
     process_list = []
-    for i in range(PROCESS_NUM):
-        p = Process(target=self_play, args=(i,))
+
+    count = Value('i',SP_GAME_COUNT)
+
+    for i in range(0,PROCESS_NUM):
+        p = Process(target=self_play, args=(i,count))
         process_list.append(p)
         
-    for i in range(PROCESS_NUM):
+    for i in range(0,PROCESS_NUM):
         print(str(i) + " start")
         process_list[i].start()
-    for i in range(PROCESS_NUM):
+
+    for i in range(0,PROCESS_NUM):
         process_list[i].join()
-    
+   
     # historyデータをマージ
     xs_all = []
     y_policies_all = []
     y_values_all = []
+
     for i in range(PROCESS_NUM):
         history_path = sorted(Path('./data/').glob(str(i) + '.tmp'))[-1]
         with history_path.open(mode='rb') as f:

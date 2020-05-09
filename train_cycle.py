@@ -7,18 +7,22 @@ from dual_network import dual_network
 from self_play import *
 from train_network import train_network
 from evaluate_network import evaluate_network
+import multiprocessing as mp
 
-# デュアルネットワークの作成
-dual_network()
+if __name__ == '__main__':
+    mp.set_start_method('spawn')
 
-for i in range(100):
-    print('Train',i,'====================')
-    # セルフプレイ部
-    #self_play()
-    paralell_self_play()
+    # デュアルネットワークの作成
+    dual_network()
 
-    # パラメータ更新部
-    train_network()
+    for i in range(100):
+        print('Train',i,'====================')
+        # セルフプレイ部
+        #self_play("")
+        paralell_self_play()
 
-    # 新パラメータ評価部
-    evaluate_network()
+        # パラメータ更新部
+        train_network()
+
+        # 新パラメータ評価部
+        evaluate_network()
