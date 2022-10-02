@@ -27,7 +27,7 @@ class State:
     def is_lose(self):
         for i in range(12):
             if self.pieces[i] == 4: # ライオン存在
-                return False
+                return len(self.legal_actions()) == 0
         return True
 
     # 引き分けかどうか
@@ -191,23 +191,34 @@ class State:
 # ランダムで行動選択
 def random_action(state):
     legal_actions = state.legal_actions()
+    if len(legal_actions) == 0:
+        print(state)
     return legal_actions[random.randint(0, len(legal_actions)-1)]
 
 # 動作確認
 if __name__ == '__main__':
-    # 状態の生成
-    state = State()
-    ar = state.pieces_array()
 
-    # ゲーム終了までのループ
+    is_end_num = 0
+    is_draw_num = 0
+
     while True:
-        # ゲーム終了時
-        if state.is_done():
-            break
+        print(f"draw:{is_draw_num}:{is_end_num}\r",end="")
+        # 状態の生成
+        state = State()
+        ar = state.pieces_array()
+        # ゲーム終了までのループ
+        while True:
+            # ゲーム終了時
+            if state.is_done():
+                if state.is_draw():
+                    is_draw_num += 1
+                if state.is_lose():
+                    is_end_num += 1
+                break
 
-        # 次の状態の取得
-        state = state.next(random_action(state))
+            # 次の状態の取得
+            state = state.next(random_action(state))
 
-        # 文字列表示
-        print(state)
-        print()
+            # 文字列表示
+            #print(state)
+            #print()
