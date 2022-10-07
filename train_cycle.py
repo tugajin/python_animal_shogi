@@ -18,8 +18,7 @@ if __name__ == '__main__':
     for i in range(100):
         print('Train',i,'====================')
         # セルフプレイ部
-        #self_play("")
-        paralell_self_play()
+        self_play()
 
         # パラメータ更新部
         train_network()

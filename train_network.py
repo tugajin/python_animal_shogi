@@ -37,7 +37,7 @@ def train_network():
     # ベストプレイヤーのモデルの読み込み
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = DualNet()
-    model.load_state_dict(torch.load('./model/best.h5'))
+    model.load_state_dict(torch.load('./model/best.h5',device))
     model = model.double()
     model = model.to(device)
     

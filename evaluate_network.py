@@ -54,7 +54,7 @@ def evaluate_network():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     device = 'cpu'
     model0 = DualNet()
-    model0.load_state_dict(torch.load('./model/latest.h5'))
+    model0.load_state_dict(torch.load('./model/latest.h5',device))
     model0 = model0.double()
     model0 = model0.to(device)
     model0.eval()
@@ -62,7 +62,7 @@ def evaluate_network():
 
     # ベストプレイヤーのモデルの読み込み
     model1 = DualNet()
-    model1.load_state_dict(torch.load('./model/best.h5'))
+    model1.load_state_dict(torch.load('./model/best.h5',device))
     model1 = model1.double()
     model1 = model1.to(device)
     model1.eval()

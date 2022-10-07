@@ -13,15 +13,18 @@ from dual_network import *
 PV_EVALUATE_COUNT = 50 # 1推論あたりのシミュレーション回数（本家は1600）
 
 # 推論
-def predict(model,device, state):
+def predict(model, state):
 
     # 推論のための入力データのシェイプの変換
     file, rank, channel = DN_INPUT_SHAPE
     x = np.array(state.pieces_array())
     x = x.reshape(channel, file, rank)
     x = np.array([x])
-    x = torch.tensor(x,dtype=torch.double)
-    
+    x = torch.tensor(x,dtype=torch.float32)
+   
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    #device = torch.device('cpu')
+
     x = x.to(device)
     
     with torch.no_grad():
@@ -29,12 +32,11 @@ def predict(model,device, state):
         y = model(x)
 
     # 方策の取得
-    policies = y[0][0][list(state.legal_actions())] # 合法手のみ
+    policies = y[0][0][list(state.legal_actions())].cpu().numpy() # 合法手のみ
     policies /= sum(policies) if sum(policies) else 1 # 合計1の確率分布に変換
 
     # 価値の取得
-    value = y[1][0][0]
-    actions = state.legal_actions()
+    value = y[1][0][0].item()
     return policies, value
 
 # ノードのリストを試行回数のリストに変換
@@ -45,7 +47,8 @@ def nodes_to_scores(nodes):
     return scores
 
 # モンテカルロ木探索のスコアの取得
-def pv_mcts_scores(model,device, state, temperature):
+def pv_mcts_scores(model, state, temperature):
+
     # モンテカルロ木探索のノードの定義
     class Node:
         # ノードの初期化
@@ -61,7 +64,10 @@ def pv_mcts_scores(model,device, state, temperature):
             # ゲーム終了時
             if self.state.is_done():
                 # 勝敗結果で価値を取得
-                value = -1 if self.state.is_lose() else 0
+                if self.state.is_lose():
+                    value = -1
+                else:
+                    value = 0
 
                 # 累計価値と試行回数の更新
                 self.w += value
@@ -72,7 +78,7 @@ def pv_mcts_scores(model,device, state, temperature):
             if not self.child_nodes:
                 
                 # ニューラルネットワークの推論で方策と価値を取得
-                policies, value = predict(model,device, self.state)
+                policies, value = predict(model, self.state)
 
                 # 累計価値と試行回数の更新
                 self.w += value
@@ -126,13 +132,13 @@ def pv_mcts_scores(model,device, state, temperature):
         scores[action] = 1
     else: # ボルツマン分布でバラつき付加
         scores = boltzman(scores, temperature)
-    
-    return scores
+         
+    return scores, (root_node.w)/(root_node.n)
 
 # モンテカルロ木探索で行動選択
-def pv_mcts_action(model,device, temperature=0):
-    def pv_mcts_action(state,device):
-        scores = pv_mcts_scores(model,device, state, temperature)
+def pv_mcts_action(model, temperature=0):
+    def pv_mcts_action(state):
+        scores,values = pv_mcts_scores(model, state, temperature)
         return np.random.choice(state.legal_actions(), p=scores)
     return pv_mcts_action
 
@@ -149,8 +155,7 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     model = DualNet()
-    model.load_state_dict(torch.load("./model/best.h5"))
-    model = model.double()
+    model.load_state_dict(torch.load("./model/best.h5",device))
     model = model.to(device)
     model.eval()
     
@@ -158,7 +163,8 @@ if __name__ == '__main__':
     state = State()
 
     # モンテカルロ木探索で行動取得を行う関数の生成
-    next_action = pv_mcts_action(model,device, 1.0)
+    next_action = pv_mcts_action(model, 1.0)
+    #next_action = pv_mcts_action(model)
 
     # ゲーム終了までループ
     while True:
@@ -167,7 +173,7 @@ if __name__ == '__main__':
             break
 
         # 行動の取得
-        action = next_action(state,device)
+        action = next_action(state)
 
         # 次の状態の取得
         state = state.next(action)

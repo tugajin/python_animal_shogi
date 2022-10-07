@@ -13,12 +13,8 @@ import pickle
 import os
 import torch
 from dual_network import *
-import concurrent.futures
-import copy
-from multiprocessing import Process, Value
 
 # パラメータの準備
-PROCESS_NUM = 2
 SP_GAME_COUNT = 500 # セルフプレイを行うゲーム数（本家は25000）
 SP_TEMPERATURE = 1.0 # ボルツマン分布の温度パラメータ
 
@@ -30,19 +26,16 @@ def first_player_value(ended_state):
     return 0
 
 # 学習データの保存
-def write_data(history,id):
+def write_data(history):
     now = datetime.now()
     os.makedirs('./data/', exist_ok=True) # フォルダがない時は生成
-    if id == "":
-        path = './data/{:04}{:02}{:02}{:02}{:02}{:02}.history'.format(
-            now.year, now.month, now.day, now.hour, now.minute, now.second)
-    else:
-        path = './data/{}.tmp'.format(id)
+    path = './data/{:04}{:02}{:02}{:02}{:02}{:02}.history'.format(
+        now.year, now.month, now.day, now.hour, now.minute, now.second)
     with open(path, mode='wb') as f:
         pickle.dump(history, f)
 
 # 1ゲームの実行
-def play(model,device):
+def play(model):
     # 学習データ
     history = []
 
@@ -53,9 +46,9 @@ def play(model,device):
         # ゲーム終了時
         if state.is_done():
             break
-        #print("do")        
+      
         # 合法手の確率分布の取得
-        scores = pv_mcts_scores(model,device, state, SP_TEMPERATURE)
+        scores, values = pv_mcts_scores(model, state, SP_TEMPERATURE)
 
         # 学習データに状態と方策を追加
         policies = [0] * DN_OUTPUT_SIZE
@@ -77,85 +70,33 @@ def play(model,device):
     return history
 
 # セルフプレイ
-def self_play(id,count):
+def self_play():
     # 学習データ
     history = []
-    # ベストプレイヤーのモデルの読み込み
-    
-    # なぜかcpuのほうが早い。
-    #device = 'cpu'
-    if id == '':
-      device = torch.device('cpu')
-    elif id == 0:
-      device = torch.device('cpu')
-    else:
-      device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    # ベストプレイヤーのモデルの読み込み
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    #device = torch.device('cpu')
     model = DualNet()
-    model.load_state_dict(torch.load('./model/best.h5'))
-    model = model.double()
+    model.load_state_dict(torch.load('./model/best.h5',device))
     model = model.to(device)
     model.eval()
-    
+
     # 複数回のゲームの実行
-    i = 0
-    while True:
+    for i in range(SP_GAME_COUNT):
         # 1ゲームの実行
-        h = play(model,device)
-        
+        h = play(model)
         history.extend(h)
 
         # 出力
-        print('proc{} SelfPlay {}/{} {}'.format(id, i+1, SP_GAME_COUNT,count.value))
-        i += 1
-        count.value -= 1 
-        if count.value <= 0:
-          break
+        print('\rSelfPlay {}/{}'.format(i+1, SP_GAME_COUNT), end='')
     print('')
     
-    write_data(history,id)
-    #return history
+    # 学習データの保存
+    write_data(history)
 
-# 並列化セルフプレイ
-def paralell_self_play():
-    
 
-    history = []
-    process_list = []
 
-    count = Value('i',SP_GAME_COUNT)
-
-    for i in range(0,PROCESS_NUM):
-        p = Process(target=self_play, args=(i,count))
-        process_list.append(p)
-        
-    for i in range(0,PROCESS_NUM):
-        print(str(i) + " start")
-        process_list[i].start()
-
-    for i in range(0,PROCESS_NUM):
-        process_list[i].join()
-   
-    # historyデータをマージ
-    xs_all = []
-    y_policies_all = []
-    y_values_all = []
-
-    for i in range(PROCESS_NUM):
-        history_path = sorted(Path('./data/').glob(str(i) + '.tmp'))[-1]
-        with history_path.open(mode='rb') as f:
-            data = pickle.load(f)
-        xs, y_policies, y_values = zip(*data)
-        xs_all.extend(xs)
-        y_policies_all.extend(y_policies)
-        y_values_all.extend(y_values)
-        os.remove('./data/' + str(i) + ".tmp")
-    history = [(xs_all[i],y_policies_all[i],y_values_all[i]) for i in range(len(xs_all))]
-    
-    write_data(history,"")
-    
-    
 # 動作確認
 if __name__ == '__main__':
-    paralell_self_play()
-    #self_play()
+    self_play()
