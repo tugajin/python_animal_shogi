@@ -13,6 +13,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import random
+import time
 
 # パラメータの準備
 RN_EPOCHS = 20 # 学習回数
@@ -42,10 +43,11 @@ def train_network(epoch_num=RN_EPOCHS, batch_size=RN_BATCH_SIZE):
     model = model.to(device)
     
     model.train()
-    optimizer = optim.SGD(model.parameters(),lr=0.001, weight_decay=0.00001)
+    optimizer = optim.SGD(model.parameters(),lr=0.005, weight_decay=0.00001)
     dataset = HistoryDataset([sorted(Path('./data').glob('*.history4'))[-1]])
     dataset_len = len(dataset)
     dataloader = DataLoader(dataset=dataset, batch_size=RN_BATCH_SIZE, shuffle=True) 
+    start = time.time()
     for i in range(epoch_num):
         print(f"epoch:{i}")
         sum_loss = 0
@@ -64,12 +66,13 @@ def train_network(epoch_num=RN_EPOCHS, batch_size=RN_BATCH_SIZE):
             sum_num += 1
             if sum_num % 1000 == 0:
                 n = RN_BATCH_SIZE * sum_num
-                print(f"{n}/{dataset_len} ({100 * (n/dataset_len):.3f}%) loss:{loss.item()}")
+                now = time.time()
+                print(f"{n}/{dataset_len} ({100 * (n/dataset_len):.3f}%) loss:{loss.item()} sec:{int(now-start)}")
 
         print(f"avg loss:{sum_loss / sum_num}")
-
-    # 最新プレイヤーのモデルの保存
-    torch.save(model.state_dict(), './model/latest_single.h5')
+        # 最新プレイヤーのモデルの保存
+        # updateが遅いので吐くようにする
+        torch.save(model.state_dict(), './model/latest_single.h5')
 
 def check_train_data():
     # 学習データの読み込み

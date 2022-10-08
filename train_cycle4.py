@@ -19,12 +19,12 @@ if __name__ == '__main__':
 
     args = sys.argv
     self_play_num = 10
-    epoch_num = 15
-    batch_size = 128
+    epoch_num = 10
+    batch_size = 512
     if len(args) >= 4:
-        self_play_num = args[1]
-        epoch_num = args[2]
-        batch_size = args[3]
+        self_play_num = int(args[1])
+        epoch_num = int(args[2])
+        batch_size = int(args[3])
 
     # デュアルネットワークの作成
     single_network()
