@@ -19,7 +19,7 @@ if __name__ == '__main__':
 
     args = sys.argv
     self_play_num = 10
-    epoch_num = 10
+    epoch_num = 5
     batch_size = 512
     if len(args) >= 4:
         self_play_num = int(args[1])

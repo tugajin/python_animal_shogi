@@ -82,6 +82,15 @@ class State:
                 return len(self.legal_actions()) == 0
         return True
 
+    # ライオンが取れるか？
+    def is_win(self):
+        actions = self.legal_actions()
+        for action in actions:
+            position_dst, _ = self.action_to_position(action)
+            if self.enemy_pieces[11-position_dst] == 4:
+                return True
+        return False
+
     # 引き分けかどうか
     def is_draw(self):
         current_key = self.hash_key()
@@ -307,6 +316,9 @@ def alpha_beta(state, alpha, beta, depth):
     if state.is_draw():
         return  0
     
+    if state.is_win():
+        return 8000
+    
     if depth <= 0:
         return eval(state)
 
@@ -466,7 +478,9 @@ if __name__ == '__main__':
                     is_end_num += 1
                 sum_depth += len(state.history)
                 break
-
+            if state.is_win():
+                print(state)
+                exit(0)
             # 次の状態の取得
             state = state.next(random_action(state))
 

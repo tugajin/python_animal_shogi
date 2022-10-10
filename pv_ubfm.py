@@ -50,8 +50,12 @@ def predict(model, node_list, device):
             # より手数が少ない局面で勝ったほうが良いとする
             node_list[i].w = -0.9999 + (node_list[i].ply / 100) if node_list[i].state.is_lose() else 0
             node_list[i].completion = -1 if node_list[i].state.is_lose() else 0
-            #node_list[i].w = node_list[i].completion = -1 if node_list[i].state.is_lose() else 0
             node_list[i].resolved = True
+        elif node_list[i].state.is_win():
+            node_list[i].w = 0.9999 - (node_list[i].ply / 100) 
+            node_list[i].completion = 1
+            node_list[i].resolved = True
+
 
 # ノードのリストを試行回数のリストに変換
 def nodes_to_scores(nodes):

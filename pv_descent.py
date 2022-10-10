@@ -9,13 +9,16 @@ from pv_ubfm import pv_ubfm_scores
 from datetime import datetime
 from pathlib import Path
 from single_network import *
+from db import *
 
+import tracemalloc
 import random
 import operator
 import numpy as np
 import pickle
 import os
 import torch
+import time
 
 # パラメータの準備
 PV_EVALUATE_COUNT = 50 # 1推論あたりのシミュレーション回数（本家は1600）
@@ -85,7 +88,7 @@ def nodes_to_scores(nodes):
     return scores
 
 # Descent木探索のスコアの取得
-def pv_descent_scores(model, state, device, history, temperature):
+def pv_descent_scores(model, state, device, temperature):
 
     # モンテカルロ木探索のノードの定義
     class Node:
@@ -300,7 +303,7 @@ def pv_descent_scores(model, state, device, history, temperature):
     # 複数回の評価の実行
     #print("start simulation")
     for i in range(PV_EVALUATE_COUNT):
-    #    print(f"try:{i}")
+        #print(f"try:{i} \r",end="")
         if root_node.resolved:
             break
         root_node.evaluate()
@@ -312,7 +315,9 @@ def pv_descent_scores(model, state, device, history, temperature):
     scores = nodes_to_scores(root_node.child_nodes)
 
     # 探索木の情報をhistoryに登録
-    add_history(history, root_node)
+    conn, cur = create_conn()
+    add_history(cur, root_node)
+    close_conn(conn)
 
     n = root_node
     #n.dump(True)
@@ -336,9 +341,9 @@ def pv_descent_scores(model, state, device, history, temperature):
     return scores, root_node.w
 
 # Descent木探索で行動選択
-def pv_descent_action(model, device, history, temperature=0):
+def pv_descent_action(model, device, temperature=0):
     def pv_descent_action(state):
-        scores,values = pv_descent_scores(model, state, device, history, temperature)
+        scores,values = pv_descent_scores(model, state, device, temperature)
         return np.random.choice(state.legal_actions(), p=scores)
     return pv_descent_action
 
@@ -347,27 +352,17 @@ def boltzman(xs, temperature):
     xs = [x ** (1 / temperature) for x in xs]
     return [x / sum(xs) for x in xs]
 
+
 # 探索木の情報を保存
-def add_history(history, node):
-    history.append([node.state.pieces_array(), node.w, node.completion, node.resolved])
+def add_history(cur, node):
+    insert2(cur, node.state.pieces_array(), node.w)
     # このノードの情報を格納
     if node.child_nodes is not None:
         for child in node.child_nodes:
-            add_history(history,child)
-
-# 学習データの保存
-def write_data(history):
-    now = datetime.now()
-    os.makedirs('./data/', exist_ok=True) # フォルダがない時は生成
-    path = './data/{:04}{:02}{:02}{:02}{:02}{:02}.history4'.format(
-        now.year, now.month, now.day, now.hour, now.minute, now.second)
-    with open(path, mode='wb') as f:
-        pickle.dump(history, f)
+            add_history(cur, child)
 
 # 1ゲームの実行
 def play(model, device):
-    # 学習データ
-    history = []
 
     # 状態の生成
     state = State()
@@ -381,9 +376,10 @@ def play(model, device):
             break
         
         # 合法手の確率分布の取得
-        scores, values = pv_descent_scores(model, state, device, history, SP_TEMPERATURE)
+        scores, values = pv_descent_scores(model, state, device, SP_TEMPERATURE)
         # 学習データに状態と方策を追加
         if random.random() < 0.4:
+            #print("rand")
             action = np.random.choice(state.legal_actions())
         else:
             # 行動の取得
@@ -391,13 +387,11 @@ def play(model, device):
         # 次の状態の取得
         state = state.next(action)
         i += 1
-    return history, result
+    return result
 
 # セルフプレイ
 def self_play(self_play_num = SP_GAME_COUNT):
     # 学習データ
-    history = []
-
     # ベストプレイヤーのモデルの読み込み
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     #device = torch.device('cpu')
@@ -406,19 +400,21 @@ def self_play(self_play_num = SP_GAME_COUNT):
     model = model.to(device)
     model.eval()
 
+    #登録するDBを再構築
+    try:
+        delete_all()
+    except:
+        pass
+    create_db()
+
     # 複数回のゲームの実行
     for i in range(self_play_num):
         # 1ゲームの実行
-        h, r = play(model, device)
-        history.extend(h)
+        r = play(model, device)
         # 出力
-        print('\rSelfPlay {}/{} {}'.format(i+1, SP_GAME_COUNT,r), end='')
-
-    print(f"\nhistory_len:{len(history)}")
-    # 学習データの保存
-    write_data(history)
+        print('\rSelfPlay {}/{} {}'.format(i+1, self_play_num,r), end='')
 
 # 動作確認
 if __name__ == '__main__':
     init_key()
-    self_play()
+    self_play(5)

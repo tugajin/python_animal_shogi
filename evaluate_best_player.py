@@ -10,7 +10,7 @@ import numpy as np
 from single_network import *
 
 # パラメータの準備
-EP_GAME_COUNT = 10  # 1評価あたりのゲーム数
+EP_GAME_COUNT = 100  # 1評価あたりのゲーム数
 
 # 先手プレイヤーのポイント
 def first_player_point(ended_state):
@@ -84,16 +84,16 @@ def evaluate_best_player():
     next_pv_mcts_action = pv_ubfm_action(model, device, 0)
 
     # VSランダム
-    next_actions = (next_pv_mcts_action, random_action)
-    evaluate_algorithm_of('VS_Random', next_actions)
+    #next_actions = (next_pv_mcts_action, random_action)
+    #evaluate_algorithm_of('VS_Random', next_actions)
 
     # VSアルファベータ法
     next_actions = (next_pv_mcts_action, alpha_beta_action)
     evaluate_algorithm_of('VS_AlphaBeta', next_actions)
 
     # VSモンテカルロ木探索
-    next_actions = (next_pv_mcts_action, mcts_action)
-    evaluate_algorithm_of('VS_MCTS', next_actions)
+    #next_actions = (next_pv_mcts_action, mcts_action)
+    #evaluate_algorithm_of('VS_MCTS', next_actions)
 
 # 動作確認
 if __name__ == '__main__':
