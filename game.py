@@ -90,6 +90,17 @@ class State:
             if self.enemy_pieces[11-position_dst] == 4:
                 return True
         return False
+    
+    # 王手されているか？
+    def in_checked(self):
+        tmp_pieces = self.pieces.copy()
+        tmp_enemy_pieces = self.enemy_pieces.copy()
+        self.pieces = tmp_enemy_pieces.copy()
+        self.enemy_pieces = tmp_pieces.copy()
+        ret = self.is_win()
+        self.pieces = tmp_pieces.copy()
+        self.enemy_pieces = tmp_enemy_pieces.copy()
+        return ret
 
     # 引き分けかどうか
     def is_draw(self):
@@ -151,6 +162,14 @@ class State:
                         actions.append(self.position_to_action(p, 8-1+capture))
         return actions
 
+    def perfect_legal_actions(self):
+        actions = self.legal_actions()
+        ret = []
+        for action in actions:
+            state = self.next(action)
+            if not state.is_win():
+                ret.append(action)
+        return ret
     # 駒の移動時の合法手のリストの取得
     def legal_actions_pos(self, position_src):
         actions = []
@@ -257,34 +276,43 @@ class State:
         pieces1 = self.enemy_pieces  if self.is_first_player() else self.pieces
         hzkr1 = ('', 'vひ', 'vぞ', 'vき', 'vら')
         hzkr0 = ('', '^ひ', '^ぞ', '^き', '^ら')
-        str = "先\n" if self.is_first_player() else "後\n"
-        str += f"depth:{len(self.history)}\n"
-        str += f"hash:{self.hash_key()}\n"
+        s = "先\n" if self.is_first_player() else "後\n"
+        s += f"depth:{len(self.history)}\n"
+        s += f"hash:{self.hash_key()}\n"
+        for i in range(2):
+            s += "["
+            for j in range(15):
+                p = self.pieces if i == 0 else self.enemy_pieces
+                s += str(p[j])
+                if j != 14:
+                    s += ","
+            s += "]\n"
+
         # 後手の持ち駒
-        str += '['
+        s += '['
         for i in range(12, 15):
-            if pieces1[i] >= 2: str += hzkr1[i-11]
-            if pieces1[i] >= 1: str += hzkr1[i-11]
-        str += ']\n'
+            if pieces1[i] >= 2: s += hzkr1[i-11]
+            if pieces1[i] >= 1: s += hzkr1[i-11]
+        s += ']\n'
 
         # ボード
         for i in range(12):
             if pieces0[i] != 0:
-                str += hzkr0[pieces0[i]]
+                s += hzkr0[pieces0[i]]
             elif pieces1[11-i] != 0:
-                str += hzkr1[pieces1[11-i]]
+                s += hzkr1[pieces1[11-i]]
             else:
-                str += ' - '
+                s += ' - '
             if i % 3 == 2:
-                str += '\n'
+                s += '\n'
 
         # 先手の持ち駒
-        str += '['
+        s += '['
         for i in range(12, 15):
-            if pieces0[i] >= 2: str += hzkr0[i-11]
-            if pieces0[i] >= 1: str += hzkr0[i-11]
-        str += ']\n'
-        return str
+            if pieces0[i] >= 2: s += hzkr0[i-11]
+            if pieces0[i] >= 1: s += hzkr0[i-11]
+        s += ']\n'
+        return s
 
 # ランダムで行動選択
 def random_action(state):
@@ -454,38 +482,47 @@ def mcts_action(state):
         n_list.append(c.n)
     return legal_actions[argmax(n_list)]
 
-
+def test():
+    state = State([0,0,0,0,0,0,0,2,1,0,4,3,0,0,0],[0,0,0,0,0,0,0,4,1,2,0,3,0,0,0],[])
+    print(state)
+    l = state.perfect_legal_actions()
+    print("---------")
+    for ll in l:
+        print(state.action_str(ll))
 # 動作確認
 if __name__ == '__main__':
-
     is_end_num = 0
     is_draw_num = 0
     sum_depth = 0
     init_key()
-
+    #test()
+    #exit(1)
+    
     while True:
         # 状態の生成
         state = State()
         ar = state.pieces_array()
+        print(f"draw:{is_draw_num} end:{is_end_num} \r",end="")
         # ゲーム終了までのループ
         while True:
-            append_pos_dict(state.hash_key())
+            #print(stateW)
             # ゲーム終了時
-            if state.is_done():
-                if state.is_draw():
-                    is_draw_num += 1
-                if state.is_lose():
-                    is_end_num += 1
-                sum_depth += len(state.history)
+            if state.is_lose():
+                is_end_num += 1
                 break
-            if state.is_win():
-                print(state)
-                exit(0)
+            if state.is_draw():
+                is_draw_num += 1
+                break
             # 次の状態の取得
-            state = state.next(random_action(state))
+            legal_actions = state.perfect_legal_actions()
+            
+            if len(legal_actions) == 0:
+                is_end_num += 1
+                break
+            next_action = legal_actions[random.randint(0, len(legal_actions)-1)]
+            state = state.next(next_action)
 
             # 文字列表示
             #print(state)
             #print()
-        print(f"draw:{is_draw_num} end:{is_end_num} size:{len_pos_dict()} depth:{sum_depth/(is_end_num+is_draw_num)}\r",end="")
         

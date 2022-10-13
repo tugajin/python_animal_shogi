@@ -27,6 +27,9 @@ if __name__ == '__main__':
         batch_size = int(args[3])
 
     # デュアルネットワークの作成
+    print(f"selfplay:{self_play_num}")
+    print(f"epoch:{epoch_num}")
+    print(f"batch:{batch_size}")
     single_network()
     
     for i in range(25):

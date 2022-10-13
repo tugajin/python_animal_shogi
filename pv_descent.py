@@ -64,6 +64,10 @@ def predict(model, node_list, device):
             node_list[i].completion = -1 if node_list[i].state.is_lose() else 0
             #node_list[i].w = node_list[i].completion = -1 if node_list[i].state.is_lose() else 0
             node_list[i].resolved = True
+        elif node_list[i].state.is_win():
+            node_list[i].w = 0.9999 - (node_list[i].ply / 100) 
+            node_list[i].completion = 1
+            node_list[i].resolved = True
 
 # ノードのリストを試行回数のリストに変換
 def nodes_to_scores(nodes):
@@ -378,9 +382,12 @@ def play(model, device):
         # 合法手の確率分布の取得
         scores, values = pv_descent_scores(model, state, device, SP_TEMPERATURE)
         # 学習データに状態と方策を追加
-        if random.random() < 0.4:
-            #print("rand")
-            action = np.random.choice(state.legal_actions())
+        if (not state.in_checked()) and (random.random() < 0.4):
+            l = state.perfect_legal_actions()
+            if len(l) == 0:
+                result = 1
+                break
+            action = np.random.choice(l)
         else:
             # 行動の取得
             action = state.legal_actions()[np.argmax(scores)]
