@@ -162,12 +162,29 @@ class State:
                         actions.append(self.position_to_action(p, 8-1+capture))
         return actions
 
+    # らいおんが取られる手を生成しない
     def perfect_legal_actions(self):
         actions = self.legal_actions()
         ret = []
         for action in actions:
             state = self.next(action)
             if not state.is_win():
+                ret.append(action)
+        return ret
+    # 王手生成
+    def check_legal_actions(self):
+        actions = self.legal_actions()
+        ret = []
+        for action in actions:
+            state = self.next(action)
+            # 合法手だけに絞る
+            if state.is_win():
+                continue
+            # 念の為historyをリセット
+            # 先手後手を入れ替えて、2手指しする
+            state2 = State(state.enemy_pieces.copy(),state.pieces.copy(),[])
+            # 2手指しして勝てたら王手と判断
+            if state2.is_win():
                 ret.append(action)
         return ret
     # 駒の移動時の合法手のリストの取得
@@ -369,7 +386,7 @@ def alpha_beta_action(state):
     best_action = 0
     alpha = -float('inf')
     for action in state.legal_actions():
-        score = -alpha_beta(state.next(action), -float('inf'), -alpha, 2)
+        score = -alpha_beta(state.next(action), -float('inf'), -alpha, 4)
         if score > alpha:
             best_action = action
             alpha = score
