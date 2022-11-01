@@ -11,7 +11,7 @@ def mate_search(state, depth, and_or):
         return -1 if and_or == AND_STATE else 1
     # 引き分けも詰まないので-1
     elif state.is_draw():
-        return -1 if and_or == AND_STATE else 1
+        return -1 
     elif state.is_win():
         return 1 if and_or == AND_STATE else -1
     
@@ -46,13 +46,25 @@ def mate_action(state):
             break
     return best_action
 
+# 深さ優先で詰められているか探索
+def mated_action(state):
+    best_action = None
+    for action in state.perfect_legal_actions():
+        #print(state.action_str(action))
+        score = mate_search(state.next(action), 3, AND_STATE)
+        #print(score)
+        if score != 1:
+            best_action = action
+            break
+    return best_action
+
 def test():
     print("---------------------")
-    pieces       = [0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 2]
-    enemy_pieces = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 2, 0]
+    pieces       = [0,0,0,0,0,0,0,0,4,2,0,3,1,0,0]
+    enemy_pieces = [0,0,0,0,0,0,0,2,4,0,0,3,1,0,0]
     state = State(pieces,enemy_pieces,[])
     print(state)
-    print(mate_action(state))
+    print(mated_action(state))
 
     # 動作確認
 if __name__ == '__main__':
@@ -61,8 +73,8 @@ if __name__ == '__main__':
     found_mate_num = 0
     sum_depth = 0
     init_key()
-    #test()
-    #exit(1)
+    test()
+    exit(1)
     
     while True:
         # 状態の生成

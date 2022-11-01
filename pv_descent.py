@@ -4,12 +4,14 @@
 
 # パッケージのインポート
 from math import sqrt
+from multiprocessing import Process
 from game import *
 from pv_ubfm import pv_ubfm_scores
 from datetime import datetime
 from pathlib import Path
 from single_network import *
 from db import *
+from mate_search import *
 
 import tracemalloc
 import random
@@ -19,6 +21,7 @@ import pickle
 import os
 import torch
 import time
+import multiprocessing as mp
 
 # パラメータの準備
 PV_EVALUATE_COUNT = 50 # 1推論あたりのシミュレーション回数（本家は1600）
@@ -58,16 +61,29 @@ def predict(model, node_list, device):
         node_list[i].w = value
         node_list[i].n += 1
         if node_list[i].state.is_done():
-            # 勝敗結果で価値を取得
-            # より手数が少ない局面で勝ったほうが良いとする
-            node_list[i].w = -0.9999 + (node_list[i].ply / 100) if node_list[i].state.is_lose() else 0
+            node_list[i].w = score_lose(node_list[i].ply) if node_list[i].state.is_lose() else 0
             node_list[i].completion = -1 if node_list[i].state.is_lose() else 0
-            #node_list[i].w = node_list[i].completion = -1 if node_list[i].state.is_lose() else 0
             node_list[i].resolved = True
         elif node_list[i].state.is_win():
-            node_list[i].w = 0.9999 - (node_list[i].ply / 100) 
+            node_list[i].w = score_win(node_list[i].ply+1) 
             node_list[i].completion = 1
             node_list[i].resolved = True
+        #elif mate_action(node_list[i].state) is not None:
+            #print("------------------------------")
+            #print("found mate")
+            #print(node_list[i].state)
+            #print("------------------------------")
+            # FIXME 何手で詰んだかわからないので、適当な値
+            # resolvedにしてしまうと詰み局面を学習対象にできない
+         #   node_list[i].w = score_win(node_list[i].ply+5)
+            #node_list[i].completion = 1
+            #node_list[i].resolved = True
+        #elif mated_action(node_list[i].state) is None:
+            #print("--------------------------------")
+            #print("found mated")
+            #print(node_list[i].state)
+            #print("--------------------------------")
+        #    node_list[i].w = score_lose(node_list[i].ply+4)
 
 # ノードのリストを試行回数のリストに変換
 def nodes_to_scores(nodes):
@@ -91,8 +107,13 @@ def nodes_to_scores(nodes):
             scores[i] = c.n - c.w
     return scores
 
+def score_win(ply):
+    return 0.9999 - (ply / 100) 
+def score_lose(ply):
+    return -score_win(ply)
+
 # Descent木探索のスコアの取得
-def pv_descent_scores(model, state, device, temperature):
+def pv_descent_scores(model, state, device, history, temperature):
 
     # モンテカルロ木探索のノードの定義
     class Node:
@@ -114,21 +135,14 @@ def pv_descent_scores(model, state, device, temperature):
             print("w:",self.w)
             print("n:",self.n)
             print("ply:",self.ply)
-            print("action:",self.action)
-            print("best_action",self.best_action)
+            print("action:",self.state.action_str(self.action))
+            print("best_action",self.state.action_str(self.best_action))
             print("has_child:",not self.child_nodes is None)
             print("resoloved:",self.resolved)
             print("completion:",self.completion)
             if self.child_nodes:
-                if not only_root:
-                    best = self.next_child_node()
-                    if best is None:
-                        print("best mate is null")
-                    else:
-                        print("best_child2:", best.action)
-                    
                 for c in self.child_nodes:
-                    print("  action:",c.action)
+                    print("  action:",self.state.action_str(c.action))
                     print("  child_w:",c.w)
                     print("  child_n:",c.n)
                     print("  child_ply:",c.ply)
@@ -165,6 +179,8 @@ def pv_descent_scores(model, state, device, temperature):
                 # 評価値が最大の子ノードを取得
                 next_node = self.next_child_node()
                 assert(next_node is not None)
+                assert(not next_node.resolved)
+                assert(not next_node.state.is_done())
                 next_node.evaluate()
                 # 価値と試行回数の更新
                 self.update_node()
@@ -319,12 +335,10 @@ def pv_descent_scores(model, state, device, temperature):
     scores = nodes_to_scores(root_node.child_nodes)
 
     # 探索木の情報をhistoryに登録
-    conn, cur = create_conn()
-    add_history(cur, root_node)
-    close_conn(conn)
+    add_history(history, root_node)
 
     n = root_node
-    #n.dump(True)
+   # n.dump()
 
     #while True:
     while False:
@@ -345,9 +359,9 @@ def pv_descent_scores(model, state, device, temperature):
     return scores, root_node.w
 
 # Descent木探索で行動選択
-def pv_descent_action(model, device, temperature=0):
+def pv_descent_action(model, device, history, temperature=0):
     def pv_descent_action(state):
-        scores,values = pv_descent_scores(model, state, device, temperature)
+        scores,values = pv_descent_scores(model, state, device, history, temperature)
         return np.random.choice(state.legal_actions(), p=scores)
     return pv_descent_action
 
@@ -356,23 +370,47 @@ def boltzman(xs, temperature):
     xs = [x ** (1 / temperature) for x in xs]
     return [x / sum(xs) for x in xs]
 
-
 # 探索木の情報を保存
-def add_history(cur, node):
-    insert2(cur, node.state.pieces_array(), node.w)
+def add_history(history, node):
+    s = node.state
+    w = node.w
+    c = node.completion
+    r = node.resolved
+    if mate_action(s) is not None:
+        w = score_win(node.ply+5)
+        c = 1
+        r = True
+    elif mated_action(s) is None:
+        w = score_lose(node.ply+4)
+        c = -1
+        r = True
+    history.append([node.state.pieces_array(), w, c, r])
     # このノードの情報を格納
     if node.child_nodes is not None:
         for child in node.child_nodes:
-            add_history(cur, child)
+            add_history(history,child)
+
+# 学習データの保存
+def write_data(history):
+    now = datetime.now()
+    os.makedirs('./data/', exist_ok=True) # フォルダがない時は生成
+    path = './data/{:04}{:02}{:02}{:02}{:02}{:02}.history4'.format(
+        now.year, now.month, now.day, now.hour, now.minute, now.second)
+    with open(path, mode='wb') as f:
+        pickle.dump(history, f)
 
 # 1ゲームの実行
 def play(model, device):
+    # 学習データ
+    history = []
 
     # 状態の生成
     state = State()
     i = 0
     result = 0
+    value_history = []
     while True:
+        #print(f"{i} {os.getpid()}",end="\n")
         #print(state)
         # ゲーム終了時
         if state.is_done():
@@ -380,25 +418,28 @@ def play(model, device):
             break
         
         # 合法手の確率分布の取得
-        scores, values = pv_descent_scores(model, state, device, SP_TEMPERATURE)
+        scores, values = pv_descent_scores(model, state, device, history, SP_TEMPERATURE)
+        value_history.append(values)
         # 学習データに状態と方策を追加
-        if (not state.in_checked()) and (random.random() < 0.4):
-            l = state.perfect_legal_actions()
-            if len(l) == 0:
-                result = 1
-                break
-            action = np.random.choice(l)
+        if random.random() < 0.4:
+            action = np.random.choice(state.legal_actions())
         else:
             # 行動の取得
             action = state.legal_actions()[np.argmax(scores)]
         # 次の状態の取得
         state = state.next(action)
         i += 1
-    return result
+        # if i > 2:
+        #     print(state)
+        #     print(value_history[-1] - value_history[-3])
+        #     print(value_history[-1])
+        
+    return history, result
 
 # セルフプレイ
 def self_play(self_play_num = SP_GAME_COUNT):
     # 学習データ
+    history = []
     # ベストプレイヤーのモデルの読み込み
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     #device = torch.device('cpu')
@@ -407,21 +448,28 @@ def self_play(self_play_num = SP_GAME_COUNT):
     model = model.to(device)
     model.eval()
 
-    #登録するDBを再構築
-    try:
-        delete_all()
-    except:
-        pass
-    create_db()
-
     # 複数回のゲームの実行
     for i in range(self_play_num):
         # 1ゲームの実行
-        r = play(model, device)
+        h, r = play(model, device)
+        history.extend(h)
         # 出力
         print('\rSelfPlay {}/{} {}'.format(i+1, self_play_num,r), end='')
-
+    print(f"\nhistory_len:{len(history)}")
+    # 学習データの保存
+    write_data(history)
 # 動作確認
 if __name__ == '__main__':
     init_key()
-    self_play(5)
+    #self_play(2)
+    # ベストプレイヤーのモデルの読み込み
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = SingleNet()
+    model.load_state_dict(torch.load('./model/best_single.h5',device))
+    model = model.to(device)
+    model.eval()
+    print("---------------------")
+    pieces       = [0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 2]
+    enemy_pieces = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 2, 0]
+    state = State(pieces,enemy_pieces,[])
+    scores, values = pv_descent_scores(model, state, device, SP_TEMPERATURE)

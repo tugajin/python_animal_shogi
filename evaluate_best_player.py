@@ -8,9 +8,10 @@ from pv_ubfm import pv_ubfm_action
 from pathlib import Path
 import numpy as np
 from single_network import *
+import time
 
 # パラメータの準備
-EP_GAME_COUNT = 100  # 1評価あたりのゲーム数
+EP_GAME_COUNT = 50  # 1評価あたりのゲーム数
 
 # 先手プレイヤーのポイント
 def first_player_point(ended_state):
@@ -27,7 +28,7 @@ def play(next_actions):
     # ゲーム終了までループ
     while True:
         #print("---------------------------------")
-       # print(state)
+        #print(state)
         # ゲーム終了時
         if state.is_done():
             break
@@ -35,7 +36,6 @@ def play(next_actions):
         # 行動の取得
         next_action = next_actions[0] if state.is_first_player() else next_actions[1]
         action = next_action(state)
-
         # 次の状態の取得
         state = state.next(action)
 
@@ -70,6 +70,7 @@ def evaluate_algorithm_of(label, next_actions):
     # 平均ポイントの計算
     average_point = total_point / EP_GAME_COUNT
     print(label, average_point, result_list)
+    return average_point
 
 # ベストプレイヤーの評価
 def evaluate_best_player():
@@ -83,14 +84,27 @@ def evaluate_best_player():
     # PV MCTSで行動選択を行う関数の生成
     next_pv_mcts_action = pv_ubfm_action(model, device, 0)
 
-    # VSランダム
-    #next_actions = (next_pv_mcts_action, random_action)
-    #evaluate_algorithm_of('VS_Random', next_actions)
+    # # VSランダム
+    next_actions = (next_pv_mcts_action, random_action)
+    if evaluate_algorithm_of('VS_Random', next_actions) < 0.5:
+        return
+    # VSアルファベータ法
+    next_actions = (next_pv_mcts_action, alpha_beta_action1)
+    if evaluate_algorithm_of('VS_AlphaBeta1', next_actions) < 0.5:
+        return
 
     # VSアルファベータ法
-    next_actions = (next_pv_mcts_action, alpha_beta_action)
-    evaluate_algorithm_of('VS_AlphaBeta', next_actions)
-
+    next_actions = (next_pv_mcts_action, alpha_beta_action2)
+    if evaluate_algorithm_of('VS_AlphaBeta2', next_actions) < 0.5:
+        return
+    # VSアルファベータ法
+    next_actions = (next_pv_mcts_action, alpha_beta_action3)
+    if evaluate_algorithm_of('VS_AlphaBeta3', next_actions) < 0.5:
+        return
+    # VSアルファベータ法
+    next_actions = (next_pv_mcts_action, alpha_beta_action4)
+    if evaluate_algorithm_of('VS_AlphaBeta4', next_actions) < 0.5:
+        return
     # VSモンテカルロ木探索
     #next_actions = (next_pv_mcts_action, mcts_action)
     #evaluate_algorithm_of('VS_MCTS', next_actions)

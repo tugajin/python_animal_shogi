@@ -275,6 +275,8 @@ class State:
         return key
     # actionの文字列化
     def action_str(self, action):
+        if action == -1:
+            return "NONE"
         position_dst, position_src = self.action_to_position(action)
         if position_src < 8:
             # 駒の移動元
@@ -381,12 +383,57 @@ def alpha_beta(state, alpha, beta, depth):
     return alpha
 
 # アルファベータ法で行動選択
-def alpha_beta_action(state):
+def alpha_beta_action4(state):
     # 合法手の状態価値の計算
     best_action = 0
     alpha = -float('inf')
     for action in state.legal_actions():
         score = -alpha_beta(state.next(action), -float('inf'), -alpha, 4)
+        if score > alpha:
+            best_action = action
+            alpha = score
+
+    # 合法手の状態価値の最大値を持つ行動を返す
+    #print(f"best_score:{alpha}")
+    return best_action
+
+# アルファベータ法で行動選択
+def alpha_beta_action3(state):
+    # 合法手の状態価値の計算
+    best_action = 0
+    alpha = -float('inf')
+    for action in state.legal_actions():
+        score = -alpha_beta(state.next(action), -float('inf'), -alpha, 2)
+        if score > alpha:
+            best_action = action
+            alpha = score
+
+    # 合法手の状態価値の最大値を持つ行動を返す
+    #print(f"best_score:{alpha}")
+    return best_action
+
+# アルファベータ法で行動選択
+def alpha_beta_action2(state):
+    # 合法手の状態価値の計算
+    best_action = 0
+    alpha = -float('inf')
+    for action in state.legal_actions():
+        score = -alpha_beta(state.next(action), -float('inf'), -alpha, 2)
+        if score > alpha:
+            best_action = action
+            alpha = score
+
+    # 合法手の状態価値の最大値を持つ行動を返す
+    #print(f"best_score:{alpha}")
+    return best_action
+
+# アルファベータ法で行動選択
+def alpha_beta_action1(state):
+    # 合法手の状態価値の計算
+    best_action = 0
+    alpha = -float('inf')
+    for action in state.legal_actions():
+        score = -alpha_beta(state.next(action), -float('inf'), -alpha, 1)
         if score > alpha:
             best_action = action
             alpha = score

@@ -36,7 +36,12 @@ def create_conn():
 
 def insert2(cur, pos, result):
     j = json.dumps(pos)
-    cur.execute(f"insert into history(pos, result) values('{j}',{result})")
+    for i in range(100):
+        try:
+            cur.execute(f"insert into history(pos, result) values('{j}',{result})")
+            break
+        except:
+           pass 
 
 def close_conn(conn):
     # データベースへコミット。これで変更が反映される。

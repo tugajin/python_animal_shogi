@@ -43,8 +43,8 @@ def train_network(epoch_num=RN_EPOCHS, batch_size=RN_BATCH_SIZE):
     model = model.to(device)
     
     model.train()
-    optimizer = optim.SGD(model.parameters(),lr=0.005, weight_decay=0.00001)
-    dataset = HistoryDataset2()
+    optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.00001)
+    dataset = HistoryDataset([sorted(Path('./data').glob('*.history4'))[-1]])
     dataset_len = len(dataset)
     dataloader = DataLoader(dataset=dataset, batch_size=RN_BATCH_SIZE, shuffle=True) 
     start = time.time()
@@ -52,7 +52,7 @@ def train_network(epoch_num=RN_EPOCHS, batch_size=RN_BATCH_SIZE):
         print(f"epoch:{i}")
         sum_loss = 0
         sum_num = 0 
-        for x, y in dataloader:
+        for x, y, c, r in dataloader:
             x = x.float().to(device)
             y = y.float().to(device)
                 
@@ -83,6 +83,8 @@ def check_train_data():
         state = State(x[0][0],x[0][1])
         print(state)
         print(f"deep:{y_deep}")
+        print(f"c:{c}")
+        print(f"r:{r}")
         print("------------------------")
 
 # 動作確認
