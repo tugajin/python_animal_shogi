@@ -11,6 +11,7 @@ from evaluate_best_player import *
 import multiprocessing as mp
 import sys
 import subprocess
+import torch
 
 
 if __name__ == '__main__':
@@ -26,6 +27,8 @@ if __name__ == '__main__':
         self_play_num = int(args[1])
         epoch_num = int(args[2])
         batch_size = int(args[3])
+
+    print("GPU") if torch.cuda.is_available() else print("CPU")
 
     # デュアルネットワークの作成
     print(f"selfplay:{self_play_num}")
