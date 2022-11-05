@@ -85,9 +85,9 @@ def evaluate_best_player():
     next_pv_mcts_action = pv_ubfm_action(model, device, 0)
 
     # # VSランダム
-    next_actions = (next_pv_mcts_action, random_action)
-    if evaluate_algorithm_of('VS_Random', next_actions) < 0.5:
-        return
+    #next_actions = (next_pv_mcts_action, random_action)
+    #if evaluate_algorithm_of('VS_Random', next_actions) < 0.5:
+    #    return
     # VSアルファベータ法
     #next_actions = (next_pv_mcts_action, alpha_beta_action1)
     #if evaluate_algorithm_of('VS_AlphaBeta1', next_actions) < 0.5:
