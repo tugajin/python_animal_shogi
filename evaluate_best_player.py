@@ -89,18 +89,18 @@ def evaluate_best_player():
     if evaluate_algorithm_of('VS_Random', next_actions) < 0.5:
         return
     # VSアルファベータ法
-    next_actions = (next_pv_mcts_action, alpha_beta_action1)
-    if evaluate_algorithm_of('VS_AlphaBeta1', next_actions) < 0.5:
-        return
+    #next_actions = (next_pv_mcts_action, alpha_beta_action1)
+    #if evaluate_algorithm_of('VS_AlphaBeta1', next_actions) < 0.5:
+    #    return
 
     # VSアルファベータ法
-    next_actions = (next_pv_mcts_action, alpha_beta_action2)
-    if evaluate_algorithm_of('VS_AlphaBeta2', next_actions) < 0.5:
-        return
+    #next_actions = (next_pv_mcts_action, alpha_beta_action2)
+    #if evaluate_algorithm_of('VS_AlphaBeta2', next_actions) < 0.5:
+    #    return
     # VSアルファベータ法
-    next_actions = (next_pv_mcts_action, alpha_beta_action3)
-    if evaluate_algorithm_of('VS_AlphaBeta3', next_actions) < 0.5:
-        return
+    #next_actions = (next_pv_mcts_action, alpha_beta_action3)
+    #if evaluate_algorithm_of('VS_AlphaBeta3', next_actions) < 0.5:
+    #    return
     # VSアルファベータ法
     next_actions = (next_pv_mcts_action, alpha_beta_action4)
     if evaluate_algorithm_of('VS_AlphaBeta4', next_actions) < 0.5:

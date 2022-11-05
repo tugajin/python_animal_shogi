@@ -10,6 +10,7 @@ from evaluate_network2 import *
 from evaluate_best_player import *
 import multiprocessing as mp
 import sys
+import subprocess
 
 
 if __name__ == '__main__':
@@ -45,3 +46,4 @@ if __name__ == '__main__':
         evaluate_problem()
         evaluate_best_player()
         update_best_player()
+        res = subprocess.call('gsutil cp ./model/*.h5 gs://model-storage1/')
