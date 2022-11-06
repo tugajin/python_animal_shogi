@@ -10,7 +10,6 @@ from evaluate_network2 import *
 from evaluate_best_player import *
 import multiprocessing as mp
 import sys
-import subprocess
 import torch
 
 
@@ -47,6 +46,5 @@ if __name__ == '__main__':
         # 新パラメータ評価部
         #evaluate_network()
         evaluate_problem()
-        evaluate_best_player()
         update_best_player()
-        res = subprocess.call('gsutil cp ./model/*.h5 gs://model-storage1/')
+        evaluate_best_player()
