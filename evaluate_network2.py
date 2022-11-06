@@ -13,7 +13,7 @@ from single_network import *
 import shutil
 
 # パラメータの準備
-EN_GAME_COUNT = 10 # 1評価あたりのゲーム数（本家は400）
+EN_GAME_COUNT = 50 # 1評価あたりのゲーム数（本家は400）
 EN_TEMPERATURE = 0.7 # ボルツマン分布の温度
 
 # 先手プレイヤーのポイント
@@ -36,7 +36,7 @@ def play(next_actions,device):
 
         # 行動の取得
         next_action = next_actions[0] if state.is_first_player() else next_actions[1]
-        action = next_action(state,device)
+        action = next_action(state)
 
         # 次の状態の取得
         state = state.next(action)
@@ -54,38 +54,46 @@ def evaluate_network():
     # 最新プレイヤーのモデルの読み込み
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    device = 'cpu'
-    model0 = DualNet()
-    model0.load_state_dict(torch.load('./model/latest.h5',device))
-    model0 = model0.double()
+    model0 = SingleNet()
+    model0.load_state_dict(torch.load('./model/latest_single.h5',device))
+    model0 = model0.float()
     model0 = model0.to(device)
     model0.eval()
     
 
     # ベストプレイヤーのモデルの読み込み
-    model1 = DualNet()
-    model1.load_state_dict(torch.load('./model/best.h5',device))
-    model1 = model1.double()
+    model1 = SingleNet()
+    model1.load_state_dict(torch.load('./model/best_single.h5',device))
+    model1 = model1.float()
     model1 = model1.to(device)
     model1.eval()
 
     
     # PV MCTSで行動選択を行う関数の生成
-    next_action0 = pv_mcts_action(model0,device, EN_TEMPERATURE)
-    next_action1 = pv_mcts_action(model1,device, EN_TEMPERATURE)
+    next_action0 = pv_ubfm_action(model0,device, EN_TEMPERATURE)
+    next_action1 = pv_ubfm_action(model1,device, EN_TEMPERATURE)
     next_actions = (next_action0, next_action1)
 
     # 複数回の対戦を繰り返す
     total_point = 0
+    result_list = [0,0,0]
     for i in range(EN_GAME_COUNT):
         # 1ゲームの実行
         if i % 2 == 0:
-            total_point += play(next_actions,device)
+            result = play(next_actions,device)
         else:
-            total_point += 1 - play(list(reversed(next_actions)),device)
-
+            result = 1 - play(list(reversed(next_actions)),device)
+        total_point += result
+        if result == 1:
+            index = 0
+        elif result == 0.5:
+            index = 1
+        else:
+            index = 2
+            #exit(0)
+        result_list[index] += 1
         # 出力
-        print('\rEvaluate {}/{}'.format(i + 1, EN_GAME_COUNT), end='')
+        print('\rEvaluate {}/{} {}'.format(i + 1, EN_GAME_COUNT, result_list), end='')
     print('')
 
     # 平均ポイントの計算
@@ -222,5 +230,5 @@ def evaluate_problem():
 # 動作確認
 if __name__ == '__main__':
     init_key()
-    evaluate_problem()
-    #evaluate_network()
+    #evaluate_problem()
+    evaluate_network()
