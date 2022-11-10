@@ -383,6 +383,21 @@ def alpha_beta(state, alpha, beta, depth):
     return alpha
 
 # アルファベータ法で行動選択
+def alpha_beta_action5(state):
+    # 合法手の状態価値の計算
+    best_action = 0
+    alpha = -float('inf')
+    for action in state.legal_actions():
+        score = -alpha_beta(state.next(action), -float('inf'), -alpha, 5)
+        if score > alpha:
+            best_action = action
+            alpha = score
+
+    # 合法手の状態価値の最大値を持つ行動を返す
+    #print(f"best_score:{alpha}")
+    return best_action
+
+# アルファベータ法で行動選択
 def alpha_beta_action4(state):
     # 合法手の状態価値の計算
     best_action = 0

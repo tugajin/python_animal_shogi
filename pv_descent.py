@@ -87,24 +87,20 @@ def predict(model, node_list, device):
 
 # ノードのリストを試行回数のリストに変換
 def nodes_to_scores(nodes):
-    scores = [1] * len(nodes)
-    max_node = max(nodes,key=lambda n : n.n)
+    scores = [0] * len(nodes)
     for i, c in enumerate(nodes):
         if c.resolved:
             if c.completion == -1:
-                n = max_node.n
-                scores = [0] * len(nodes)
-                scores[i] = max_node.n
-                break
+                p = 0.99
             elif c.completion == 0:
-                n = c.n
+                p = 0.5
             elif c.completion == 1:
-                n = 0.1
+                p = 0.01
             else:
                 assert(False)
-            scores[i] = n
+            scores[i] = p
         else:
-            scores[i] = c.n - c.w
+            scores[i] = 1.0 - c.w
     return scores
 
 def score_win(ply):
@@ -358,13 +354,6 @@ def pv_descent_scores(model, state, device, history, temperature):
         scores = boltzman(scores, temperature)
     return scores, root_node.w
 
-# Descent木探索で行動選択
-def pv_descent_action(model, device, history, temperature=0):
-    def pv_descent_action(state):
-        scores,values = pv_descent_scores(model, state, device, history, temperature)
-        return np.random.choice(state.legal_actions(), p=scores)
-    return pv_descent_action
-
 # ボルツマン分布
 def boltzman(xs, temperature):
     xs = [x ** (1 / temperature) for x in xs]
@@ -394,11 +383,31 @@ def add_history(history, node):
 def write_data(history):
     now = datetime.now()
     os.makedirs('./data/', exist_ok=True) # フォルダがない時は生成
-    path = './data/{:04}{:02}{:02}{:02}{:02}{:02}.history4'.format(
-        now.year, now.month, now.day, now.hour, now.minute, now.second)
+    path = './data/{:04}{:02}{:02}{:02}{:02}{:02}{:02}.history4'.format(
+        now.year, now.month, now.day, now.hour, now.minute, now.second, now.microsecond)
     with open(path, mode='wb') as f:
         pickle.dump(history, f)
 
+# ε-greedyで選ぶ
+def e_greedy(l, scores, p):
+    # 学習データに状態と方策を追加
+    if random.random() < p:
+        action = np.random.choice(l)
+    else:
+        # 行動の取得
+        action = l[np.argmax(scores)]
+    return action
+def ordinal(l, scores, p):
+    i = 0
+    while True:
+        index = np.argmax(scores)
+        if random.random() < p:
+            #print(f"\n{i}")
+            return l[index]
+        scores[index] = -1
+        i+=1
+def ab(state):
+    return alpha_beta_action4(state)
 # 1ゲームの実行
 def play(model, device):
     # 学習データ
@@ -410,7 +419,7 @@ def play(model, device):
     result = 0
     value_history = []
     while True:
-        #print(f"{i} {os.getpid()}",end="\n")
+        print(f"{i} ",end="\r")
         #print(state)
         # ゲーム終了時
         if state.is_done():
@@ -420,26 +429,17 @@ def play(model, device):
         # 合法手の確率分布の取得
         scores, values = pv_descent_scores(model, state, device, history, SP_TEMPERATURE)
         value_history.append(values)
-        # 学習データに状態と方策を追加
-        if random.random() < 0.4:
-            action = np.random.choice(state.legal_actions())
-        else:
-            # 行動の取得
-            action = state.legal_actions()[np.argmax(scores)]
+        #action = e_greedy(state.legal_actions(), scores, 0.03)
+        action = ordinal(state.legal_actions(), scores, 0.8)
         # 次の状態の取得
         state = state.next(action)
         i += 1
-        # if i > 2:
-        #     print(state)
-        #     print(value_history[-1] - value_history[-3])
-        #     print(value_history[-1])
         
     return history, result
 
 # セルフプレイ
 def self_play(self_play_num = SP_GAME_COUNT):
-    # 学習データ
-    history = []
+    single_network()
     # ベストプレイヤーのモデルの読み込み
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     #device = torch.device('cpu')
@@ -450,26 +450,20 @@ def self_play(self_play_num = SP_GAME_COUNT):
 
     # 複数回のゲームの実行
     for i in range(self_play_num):
+        if i % 5 == 0:
+            print("load model")
+            model = SingleNet()
+            model.load_state_dict(torch.load('./model/best_single.h5',device))
+            model = model.to(device)
+            model.eval()
+
         # 1ゲームの実行
         h, r = play(model, device)
-        history.extend(h)
         # 出力
         print('\rSelfPlay {}/{} {}'.format(i+1, self_play_num,r), end='')
-    print(f"\nhistory_len:{len(history)}")
-    # 学習データの保存
-    write_data(history)
+        # 学習データの保存
+        write_data(h)
 # 動作確認
 if __name__ == '__main__':
     init_key()
-    #self_play(2)
-    # ベストプレイヤーのモデルの読み込み
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = SingleNet()
-    model.load_state_dict(torch.load('./model/best_single.h5',device))
-    model = model.to(device)
-    model.eval()
-    print("---------------------")
-    pieces       = [0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 2]
-    enemy_pieces = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 2, 0]
-    state = State(pieces,enemy_pieces,[])
-    scores, values = pv_descent_scores(model, state, device, SP_TEMPERATURE)
+    self_play(100000000000)

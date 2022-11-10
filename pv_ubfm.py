@@ -334,8 +334,8 @@ def pv_ubfm_scores(model, state, device, temperature):
     n = root_node
     #n.dump()
 
+    #while True:
     while False:
-    #while False:
         n.dump()
         if not n.child_nodes:
             break

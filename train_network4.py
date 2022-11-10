@@ -34,8 +34,10 @@ def load_all_data():
             ret.extend(tmp)
     return ret
 # ネットワークの学習
-def train_network(epoch_num=RN_EPOCHS, batch_size=RN_BATCH_SIZE):
-    
+def train_network(epoch_num=RN_EPOCHS, batch_size=RN_BATCH_SIZE, path_list=None):
+
+    if path_list is None:
+        path_list = Path('./data').glob('*.history4')
     # ベストプレイヤーのモデルの読み込み
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = SingleNet()
@@ -44,7 +46,7 @@ def train_network(epoch_num=RN_EPOCHS, batch_size=RN_BATCH_SIZE):
     
     model.train()
     optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.00001)
-    dataset = HistoryDataset([sorted(Path('./data').glob('*.history4'))[-1]])
+    dataset = HistoryDataset(path_list)
     dataset_len = len(dataset)
     dataloader = DataLoader(dataset=dataset, batch_size=RN_BATCH_SIZE, shuffle=True) 
     start = time.time()

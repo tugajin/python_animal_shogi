@@ -50,6 +50,7 @@ def evaluate_algorithm_of(label, next_actions):
     for i in range(EP_GAME_COUNT):
         # 1ゲームの実行
         if i % 2 == 0:
+            #print("normal")
             result = play(next_actions)
         else:
             result = 1 - play(list(reversed(next_actions)))
@@ -104,6 +105,10 @@ def evaluate_best_player():
     # VSアルファベータ法
     next_actions = (next_pv_mcts_action, alpha_beta_action4)
     if evaluate_algorithm_of('VS_AlphaBeta4', next_actions) < 0.5:
+        return
+    # VSアルファベータ法
+    next_actions = (next_pv_mcts_action, alpha_beta_action5)
+    if evaluate_algorithm_of('VS_AlphaBeta5', next_actions) < 0.5:
         return
     # VSモンテカルロ木探索
     #next_actions = (next_pv_mcts_action, mcts_action)
